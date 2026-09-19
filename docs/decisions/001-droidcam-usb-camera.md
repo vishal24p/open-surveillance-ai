@@ -18,7 +18,7 @@ DirectShow (`cv2.CAP_DSHOW`) opened the laptop webcam at index `0` but could not
 
 Use DroidCam over USB, configured by `DROIDCAM_INDEX` in local `.env`, and open it through `cv2.CAP_MSMF`.
 
-The acceptance check is `uv run python camera_test.py` with changing phone frames. `VideoCapture.isOpened()` alone is not sufficient.
+The acceptance check is `uv run python main.py` with changing phone frames. `VideoCapture.isOpened()` alone is not sufficient.
 
 ## Alternatives considered
 
@@ -38,4 +38,4 @@ Rejected as the project camera source. It is only useful to prove OpenCV itself 
 
 - `.env` must select the correct Windows camera index per machine.
 - A green or blank window is a stream failure to troubleshoot at DroidCam/Windows-driver level before changing application code.
-- Future video modules may assume only that `camera_test.py` has passed; they must not assume a fixed index or DirectShow support.
+- Future video modules may assume only that `main.py` has passed; they must not assume a fixed index or DirectShow support.

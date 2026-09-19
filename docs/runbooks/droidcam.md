@@ -11,7 +11,7 @@ Prove that Android phone video reaches OpenCV before adding any surveillance mod
 3. Run:
 
    ```powershell
-   uv run python camera_test.py
+   uv run python main.py
    ```
 
 4. Confirm `DroidCam` window shows moving phone video. Press `Q` to close it.

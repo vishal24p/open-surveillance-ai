@@ -4,7 +4,7 @@
 
 **Goal:** Configure the DroidCam camera index from local `.env` before opening the camera.
 
-**Architecture:** `surveillance/camera.py` reads only `DROIDCAM_INDEX` from `.env`. `camera_test.py` remains the entry point; `.env.example` gives the mobile-camera default.
+**Architecture:** `surveillance/camera.py` reads only `DROIDCAM_INDEX` from `.env`. `main.py` remains the entry point; `.env.example` gives the mobile-camera default.
 
 **Tech Stack:** Python 3.11, standard library, OpenCV, uv.
 
@@ -66,12 +66,12 @@ def get_droidcam_index(env_path: Path = Path(".env")) -> int:
 
 - [x] **Step 4: Run checks**
 
-Run: `uv run python -m unittest discover -s tests -v; uv run python -m py_compile camera_test.py surveillance\\camera.py`
+Run: `uv run python -m unittest discover -s tests -v; uv run python -m py_compile main.py surveillance\\camera.py`
 
 Expected: tests and compilation pass.
 
 - [ ] **Step 5: Add local configuration**
 
-Run: `Copy-Item .env.example .env; uv run python camera_test.py`
+Run: `Copy-Item .env.example .env; uv run python main.py`
 
 Expected: DroidCam at index `1` opens. Do not commit `.env`.

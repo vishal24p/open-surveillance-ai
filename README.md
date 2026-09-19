@@ -33,7 +33,7 @@ Install DroidCam on the phone and its Windows client. Connect the phone by USB, 
 
 ```powershell
 Copy-Item .env.example .env
-uv run python camera_test.py
+uv run python main.py
 ```
 
 The camera window opens on success. Press `Q` to close it. Change `DROIDCAM_INDEX` in `.env` if Windows assigns DroidCam another index.

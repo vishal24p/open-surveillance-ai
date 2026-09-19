@@ -15,7 +15,7 @@ Created:
 - `.gitignore` — Python, secrets, generated video/data exclusions.
 - `docs/skills-and-plugins.md` — required workflow skills and plugins.
 
-DroidCam camera code exists in `surveillance/camera.py`, with `camera_test.py` as its runner. Dependencies are installed through `uv`. The USB smoke test now works; its operating instructions and failure history are in `docs/runbooks/droidcam.md` and `docs/decisions/001-droidcam-usb-camera.md`.
+DroidCam camera code exists in `surveillance/camera.py`, with `main.py` as its runner. Dependencies are installed through `uv`. The USB smoke test now works; its operating instructions and failure history are in `docs/runbooks/droidcam.md` and `docs/decisions/001-droidcam-usb-camera.md`.
 
 ## Settled decisions
 
@@ -39,7 +39,7 @@ Android phone + DroidCam USB
         -> Q exits cleanly
 ```
 
-Run `uv run python camera_test.py` before starting a new video module. A camera handle opening is not sufficient; verify moving phone frames.
+Run `uv run python main.py` before starting a new video module. A camera handle opening is not sufficient; verify moving phone frames.
 
 Before coding, do not add YOLO, trackers, VLMs, databases, cloud APIs, or a web UI.
 

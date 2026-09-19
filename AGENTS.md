@@ -34,7 +34,7 @@ Do not add detection, tracking, VLMs, databases, cloud APIs, or a web UI until t
 
 ```powershell
 uv sync
-uv run python camera_test.py
+uv run python main.py
 ```
 
 Copy `.env.example` to `.env` before running the camera command. Set `DROIDCAM_INDEX=1` for the usual DroidCam device index.

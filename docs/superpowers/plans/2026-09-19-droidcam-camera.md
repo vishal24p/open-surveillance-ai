@@ -4,7 +4,7 @@
 
 **Goal:** Read DroidCam as a Windows virtual webcam with no RTSP path.
 
-**Architecture:** `camera_test.py` starts the camera. `surveillance/camera.py` reads one optional `DROIDCAM_INDEX` setting and opens that Windows DirectShow device through OpenCV.
+**Architecture:** `main.py` starts the camera. `surveillance/camera.py` reads one optional `DROIDCAM_INDEX` setting and opens that Windows DirectShow device through OpenCV.
 
 **Tech Stack:** Python 3.11, OpenCV, standard library, uv.
 
@@ -32,7 +32,7 @@
 
 **Files:**
 - Modify: `surveillance/camera.py`
-- Modify: `camera_test.py`
+- Modify: `main.py`
 - Modify: `tests/test_camera.py`
 - Modify: `README.md`
 - Modify: `AGENTS.md`
@@ -76,12 +76,12 @@ def show_droidcam(index: int) -> None:
 
 - [x] **Step 4: Run checks**
 
-Run: `uv run python -m unittest discover -s tests -v; uv run python -m py_compile camera_test.py surveillance\\camera.py`
+Run: `uv run python -m unittest discover -s tests -v; uv run python -m py_compile main.py surveillance\\camera.py`
 
 Expected: tests and compilation pass.
 
 - [ ] **Step 5: Manually validate DroidCam**
 
-Run: `uv run python camera_test.py`
+Run: `uv run python main.py`
 
 Expected: DroidCam window opens. If Windows assigns another device index, run `$env:DROIDCAM_INDEX=1` before the command.
