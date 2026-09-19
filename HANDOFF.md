@@ -15,7 +15,7 @@ Created:
 - `.gitignore` — Python, secrets, generated video/data exclusions.
 - `docs/skills-and-plugins.md` — required workflow skills and plugins.
 
-DroidCam camera code exists in `surveillance/camera.py`, with `main.py` as its runner. Dependencies are installed through `uv`. The USB smoke test now works; its operating instructions and failure history are in `docs/runbooks/droidcam.md` and `docs/decisions/001-droidcam-usb-camera.md`.
+DroidCam camera code exists in `surveillance/camera.py`, with `main.py` as its runner. Dependencies are installed through `uv`. The USB smoke test now works; its operating instructions and failure history are in `docs/runbooks/droidcam.md` and `docs/decisions/001-droidcam-usb-camera.md`. The current delivery order and next task are in `MILESTONES.md`.
 
 ## Settled decisions
 

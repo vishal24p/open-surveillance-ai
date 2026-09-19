@@ -21,6 +21,8 @@ Restricted-zone incident pipeline
 
 The first technical checkpoint is only live-stream reception. Later stages will be added one at a time: person detection, tracking, zone logic, evidence capture, incident understanding, and search.
 
+See [MILESTONES.md](MILESTONES.md) for current order, pass conditions, and the next implementation slice.
+
 ## Setup
 
 Requirements: Windows, Python 3.11, and `uv`.
