@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Prove that Android phone video reaches OpenCV before adding any surveillance module.
+Prove that Android phone video reaches OpenCV and the current person-detection runner receives usable frames.
 
 ## Start
 
@@ -14,12 +14,15 @@ Prove that Android phone video reaches OpenCV before adding any surveillance mod
    uv run python main.py
    ```
 
-4. Confirm `DroidCam` window shows moving phone video. Press `Q` to close it.
+4. Confirm `DroidCam` window shows moving phone video, person boxes with temporary IDs when people are visible, and `People: N`. Press `Q` to close it.
 
 ## Pass
 
 - Phone image changes when phone moves.
 - No green or blank window.
+- Person detection runs when a person is visible.
+- The same person keeps the same temporary ID across nearby frames.
+- `People: N` appears in the top-right.
 - `Q` closes window.
 
 Opening a camera is not a pass. OpenCV must successfully read real frames.
@@ -35,5 +38,6 @@ Opening a camera is not a pass. OpenCV must successfully read real frames.
 ## Rules for future work
 
 - Use `cv2.CAP_MSMF`; do not revert to `cv2.CAP_DSHOW` for DroidCam numeric indexes.
-- Do not add detection, tracking, zones, evidence, search, cloud services, or a web UI until this check passes on target machine.
+- Person detection already exists. Do not add tracking, configurable polygons, evidence, search, cloud services, or a web UI until this check passes on target machine.
+- Current restricted area is the entire camera frame. Detection boxes are overlays only; custom zone boundaries are future work.
 - Keep `DROIDCAM_INDEX` in local `.env`, never source control.

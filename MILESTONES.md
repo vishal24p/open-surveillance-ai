@@ -14,13 +14,13 @@ Notes: use `DROIDCAM_INDEX` from local `.env` and `cv2.CAP_MSMF`. See [DroidCam 
 
 ## Milestone 1 — Reliable restricted-zone incidents
 
-Goal: create an incident only when a tracked person remains inside a configured polygon for at least two seconds.
+Goal: create an incident only when a tracked person remains inside a configured polygon for at least two seconds. Until polygon configuration exists, the entire camera frame is the temporary restricted area.
 
 Build in this order:
 
-1. **Next:** person-detection smoke test on live DroidCam video. Draw person boxes and confidence only.
-2. Add tracking so each person keeps a stable temporary track ID.
-3. Define one restricted polygon and use bounding-box bottom-center as person position.
+1. **Current:** person detection runs on live DroidCam video. It draws green person boxes, confidence, and a top-right people count. These boxes show detections; they are not the restricted-zone boundary.
+2. **Current:** use persistent BoT-SORT tracking so each person keeps a temporary track ID across frames; accuracy-first configuration allows roughly one second of missed detections.
+3. **Future:** define one restricted polygon and use bounding-box bottom-center as person position. Until then, use the full frame as the restricted area.
 4. Start/stop a per-track dwell timer; emit one incident after two seconds inside.
 5. Save evidence: ten seconds before, full incident, and ten seconds after.
 6. Test with 10–20 clips: true entry, near miss, brief crossing, multiple people, partial occlusion, and exit.

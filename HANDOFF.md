@@ -8,25 +8,26 @@ Project initialized on branch `master`. Repository had no prior files or commits
 
 Created:
 
-- `AGENTS.md` — project rules and scope guard.
+- `AGENTS.md` — agent workflow rules.
 - `README.md` — problem statement, V1 boundary, setup direction.
-- `pyproject.toml` — Python 3.11 project with `opencv-python` only.
+- `pyproject.toml` — Python 3.11 project dependencies.
 - `uv.lock` — resolved dependency lockfile.
 - `.gitignore` — Python, secrets, generated video/data exclusions.
 - `docs/skills-and-plugins.md` — required workflow skills and plugins.
 
-DroidCam camera code exists in `surveillance/camera.py`, with `main.py` as its runner. Dependencies are installed through `uv`. The USB smoke test now works; its operating instructions and failure history are in `docs/runbooks/droidcam.md` and `docs/decisions/001-droidcam-usb-camera.md`. The current delivery order and next task are in `MILESTONES.md`.
+DroidCam, person-detection, and temporary tracking code is split under `surveillance/`: `camera/` owns capture, `perception/` owns YOLO/BoT-SORT, `rendering/` owns OpenCV display, `application/` owns the live loop, and `main.py` wires them. The runner detects COCO `person` objects, uses persistent BoT-SORT tracking, and draws green boxes, confidence, temporary IDs, and a people count. The entire camera frame is currently the restricted area; custom polygons or zone boxes are future work. Dependencies are installed through `uv`.
 
 ## Settled decisions
 
 - Product: restricted-zone surveillance assistant.
-- V1 incident: tracked person enters a user-defined polygon and remains at least 2 seconds.
-- First milestone: prove phone-camera streaming before adding AI.
+- V1 incident: tracked person enters a user-defined polygon and remains at least 2 seconds. Current temporary zone: entire camera frame.
+- Detection boxes are person overlays, not zone boundaries.
+- Track IDs are temporary per process, not face identities; they reset when the runner restarts.
+- Milestone 0: phone-camera streaming passed.
 - Camera source: Android phone using DroidCam as a Windows virtual webcam.
 - Connection: phone and laptop through USB; no cloud camera service.
 - First interface: CLI/OpenCV live window; no web UI.
 - Tooling: Python 3.11 + `uv`.
-- First runtime dependency: `opencv-python` only.
 
 ## Camera checkpoint
 
@@ -39,9 +40,9 @@ Android phone + DroidCam USB
         -> Q exits cleanly
 ```
 
-Run `uv run python main.py` before starting a new video module. A camera handle opening is not sufficient; verify moving phone frames.
+Run `uv run python main.py` before starting a new video module. Verify moving phone frames, person detection, and the `People: N` label. A camera handle opening is not sufficient.
 
-Before coding, do not add YOLO, trackers, VLMs, databases, cloud APIs, or a web UI.
+Use `MILESTONES.md` as the source of truth for the current implementation slice and scope guards.
 
 ## Configuration note
 
@@ -70,4 +71,4 @@ The `python` command is not on PATH; use `py -3.11` or `uv run` on this machine.
 - USB/DroidCam connectivity.
 - GPU/CUDA availability.
 - That the stream works before a manual DroidCam preflight.
-- That later VLM, detection, or search requirements are finalized.
+- That later dwell, polygon-zone, VLM, or search requirements are finalized.

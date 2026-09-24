@@ -5,7 +5,20 @@ description = "Student-sized local-first restricted-zone surveillance assistant"
 requires-python = ">=3.11,<3.12"
 dependencies = [
     "opencv-python>=4.10,<5",
+    "torch>=2.14,<2.15",
+    "torchvision>=0.29,<0.30",
+    "ultralytics>=8.4.77,<9",
+    "lap>=0.5.12,<1",
 ]
 
 [tool.uv]
 package = false
+
+[tool.uv.sources]
+torch = { index = "pytorch-cu130" }
+torchvision = { index = "pytorch-cu130" }
+
+[[tool.uv.index]]
+name = "pytorch-cu130"
+url = "https://download.pytorch.org/whl/cu130"
+explicit = true

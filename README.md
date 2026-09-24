@@ -6,6 +6,8 @@ Student-sized video intelligence project for local-first restricted-zone monitor
 
 A camera watches an area continuously, but a person cannot monitor it all the time. The system should detect a person entering a restricted zone, confirm the intrusion, preserve evidence, and eventually make incidents searchable.
 
+Current behavior: the entire camera frame is treated as the restricted area. The detector finds people anywhere in that frame, and BoT-SORT assigns temporary IDs across frames. Green boxes are detection overlays, not the restricted-zone boundary. User-drawn polygons or zone boxes come in a future version.
+
 ## V1 boundary
 
 ```text
@@ -19,9 +21,13 @@ OpenCV on laptop
 Restricted-zone incident pipeline
 ```
 
-The first technical checkpoint is only live-stream reception. Later stages will be added one at a time: person detection, tracking, zone logic, evidence capture, incident understanding, and search.
+The current runner receives the live stream, detects people, and tracks temporary IDs. Later stages will be added one at a time: dwell/incident logic, configurable zone logic, evidence capture, incident understanding, and search.
 
 See [MILESTONES.md](MILESTONES.md) for current order, pass conditions, and the next implementation slice.
+
+## Code structure
+
+`main.py` wires components only. Runtime responsibilities are separated under `surveillance/`: configuration in `config.py`, shared data in `models.py`, camera input in `camera/`, YOLO/BoT-SORT in `perception/`, OpenCV display in `rendering/`, and frame orchestration in `application/`. Future zone, dwell, incident, evidence, and storage modules should follow the same boundary rule.
 
 ## Setup
 
