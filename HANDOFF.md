@@ -15,12 +15,12 @@ Created:
 - `.gitignore` — Python, secrets, generated video/data exclusions.
 - `docs/skills-and-plugins.md` — required workflow skills and plugins.
 
-DroidCam, person-detection, and temporary tracking code is split under `surveillance/`: `camera/` owns capture, `perception/` owns YOLO/BoT-SORT, `rendering/` owns OpenCV display, `application/` owns the live loop, and `main.py` wires them. The runner detects COCO `person` objects, uses persistent BoT-SORT tracking, and draws green boxes, confidence, temporary IDs, and a people count. The entire camera frame is currently the restricted area; custom polygons or zone boxes are future work. Dependencies are installed through `uv`.
+DroidCam, person detection, temporary tracking, dwell confirmation, and evidence writing are split under `surveillance/`: `camera/` owns capture, `perception/` owns YOLO/BoT-SORT, `rendering/` owns OpenCV display, and `application/` owns the live loop, per-track incident timing, and clips. The runner detects COCO `person` objects, draws boxes/confidence/temporary IDs and a current people count, confirms an incident after two seconds, and saves an MP4 plus JSON metadata under `incidents/`. V1 defines the entire camera frame as the restricted area. Real-camera and 10–20 clip validation remain pending. Dependencies are installed through `uv`.
 
 ## Settled decisions
 
 - Product: restricted-zone surveillance assistant.
-- V1 incident: tracked person enters a user-defined polygon and remains at least 2 seconds. Current temporary zone: entire camera frame.
+- V1 incident: tracked person remains in the camera frame for at least 2 seconds. The full frame is the V1 restricted area; configurable zones are future work.
 - Detection boxes are person overlays, not zone boundaries.
 - Track IDs are temporary per process, not face identities; they reset when the runner restarts.
 - Milestone 0: phone-camera streaming passed.
@@ -71,4 +71,4 @@ The `python` command is not on PATH; use `py -3.11` or `uv run` on this machine.
 - USB/DroidCam connectivity.
 - GPU/CUDA availability.
 - That the stream works before a manual DroidCam preflight.
-- That later dwell, polygon-zone, VLM, or search requirements are finalized.
+- That later VLM, search, or configurable-zone requirements are finalized.

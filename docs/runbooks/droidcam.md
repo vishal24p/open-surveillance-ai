@@ -16,6 +16,8 @@ Prove that Android phone video reaches OpenCV and the current person-detection r
 
 4. Confirm `DroidCam` window shows moving phone video, person boxes with temporary IDs when people are visible, and `People: N`. Press `Q` to close it.
 
+To check incident recording, leave a tracked person visible for at least two seconds. The console reports confirmation, then reports the saved clip after the track is removed and the ten-second post-roll completes. MP4 clips and JSON metadata are written under `incidents/`.
+
 ## Pass
 
 - Phone image changes when phone moves.
@@ -24,6 +26,8 @@ Prove that Android phone video reaches OpenCV and the current person-detection r
 - The same person keeps the same temporary ID across nearby frames.
 - `People: N` appears in the top-right.
 - `Q` closes window.
+- A confirmed track produces an MP4 clip and JSON metadata under `incidents/` after final track removal plus ten seconds.
+- A same-track return during post-roll stays in the current incident and restarts the post-roll after its next exit.
 
 Opening a camera is not a pass. OpenCV must successfully read real frames.
 
@@ -38,6 +42,7 @@ Opening a camera is not a pass. OpenCV must successfully read real frames.
 ## Rules for future work
 
 - Use `cv2.CAP_MSMF`; do not revert to `cv2.CAP_DSHOW` for DroidCam numeric indexes.
-- Person detection already exists. Do not add tracking, configurable polygons, evidence, search, cloud services, or a web UI until this check passes on target machine.
-- Current restricted area is the entire camera frame. Detection boxes are overlays only; custom zone boundaries are future work.
+- Person detection, tracking, dwell confirmation, and evidence capture exist. Validate live camera and incident behavior on the target machine.
+- V1 restricted area is the entire camera frame. The pre-roll is ten seconds before first detection; dwell confirms after two seconds. The tracker preserves tracks through 30 missing frames and removes them on the next missed frame, then the ten-second post-roll starts. Detection boxes are overlays only; configurable zones are future work.
+- Evidence MP4s use 30 FPS with elapsed-time playback. Gaps repeat the previous image; captures above 30 FPS are dropped. Early shutdown saves incomplete metadata.
 - Keep `DROIDCAM_INDEX` in local `.env`, never source control.

@@ -4,9 +4,9 @@ Student-sized video intelligence project for local-first restricted-zone monitor
 
 ## Problem
 
-A camera watches an area continuously, but a person cannot monitor it all the time. The system should detect a person entering a restricted zone, confirm the intrusion, preserve evidence, and eventually make incidents searchable.
+A camera watches an area continuously, but a person cannot monitor it all the time. The system should detect a person in the restricted area, confirm the intrusion, preserve evidence, and eventually make incidents searchable. In V1, the entire camera frame is the restricted area.
 
-Current behavior: the entire camera frame is treated as the restricted area. The detector finds people anywhere in that frame, and BoT-SORT assigns temporary IDs across frames. Green boxes are detection overlays, not the restricted-zone boundary. User-drawn polygons or zone boxes come in a future version.
+V1 rule: the entire camera frame is the restricted area. The runner detects people anywhere in that frame, BoT-SORT assigns temporary IDs, and a track seen for two seconds confirms an incident. It saves a clip from ten seconds before first detection through ten seconds after final track removal. A same-track return during post-roll continues the incident without another dwell. Green boxes are detection overlays, not a zone boundary. Configurable zones may come in a future version.
 
 ## V1 boundary
 
@@ -21,13 +21,15 @@ OpenCV on laptop
 Restricted-zone incident pipeline
 ```
 
-The current runner receives the live stream, detects people, and tracks temporary IDs. Later stages will be added one at a time: dwell/incident logic, configurable zone logic, evidence capture, incident understanding, and search.
+The current runner receives the live stream, detects people, tracks temporary IDs, confirms dwell incidents, and saves evidence clips under `incidents/`. Validate incident behavior on 10–20 real clips before treating Milestone 1 as complete. Incident understanding and search follow in later milestones; configurable zones are outside V1.
+
+Evidence plays at 30 FPS with real elapsed timing: gaps repeat the last captured frame, and captures above 30 FPS are dropped. JPEG pre-roll reduces memory use; clips contain raw camera images without detection overlays. If recording stops early, JSON marks the clip incomplete.
 
 See [MILESTONES.md](MILESTONES.md) for current order, pass conditions, and the next implementation slice.
 
 ## Code structure
 
-`main.py` wires components only. Runtime responsibilities are separated under `surveillance/`: configuration in `config.py`, shared data in `models.py`, camera input in `camera/`, YOLO/BoT-SORT in `perception/`, OpenCV display in `rendering/`, and frame orchestration in `application/`. Future zone, dwell, incident, evidence, and storage modules should follow the same boundary rule.
+`main.py` wires components only. Runtime responsibilities are separated under `surveillance/`: configuration in `config.py`, shared data in `models.py`, camera input in `camera/`, YOLO/BoT-SORT in `perception/`, OpenCV display in `rendering/`, and frame orchestration, dwell tracking, and evidence writing in `application/`. Future storage and configurable-zone modules should follow the same boundary rule.
 
 ## Setup
 
