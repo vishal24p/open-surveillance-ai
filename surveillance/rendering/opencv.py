@@ -3,7 +3,7 @@ import cv2
 from ..models import TrackedDetection
 
 
-WINDOW_NAME = "DroidCam"
+WINDOW_NAME = "Surveillance"
 
 
 def draw_person_detections(

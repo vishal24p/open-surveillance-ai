@@ -4,9 +4,9 @@ Student-sized video intelligence project for local-first restricted-zone monitor
 
 ## Problem
 
-A camera watches an area continuously, but a person cannot monitor it all the time. The system should detect a person entering a restricted zone, confirm the intrusion, preserve evidence, and eventually make incidents searchable.
+A camera watches an area continuously, but a person cannot monitor it all the time. The system should detect a person in the restricted area, confirm the intrusion, preserve evidence, and eventually make incidents searchable. In V1, the entire camera frame is the restricted area.
 
-Current behavior: the entire camera frame is treated as the restricted area. The detector finds people anywhere in that frame, and BoT-SORT assigns temporary IDs across frames. Green boxes are detection overlays, not the restricted-zone boundary. User-drawn polygons or zone boxes come in a future version.
+V1 rule: the entire camera frame is the restricted area and incident anchor. Any people present for two uninterrupted seconds confirm one frame incident. Individual entrances, departures, or tracking-ID changes do not split it while anyone remains. An empty frame before confirmation resets the timer. After confirmation, ten seconds with nobody detected end the incident; anyone returning before that deadline continues the same incident. Every incident gets its own numbered folder under `incidents/`, with `incident.mp4` and `incident.json` inside. The clip includes ten seconds before first detection through the ten-second empty interval. Green boxes and temporary BoT-SORT IDs label detections; they do not control incidents. Configurable zones may come in a future version.
 
 ## V1 boundary
 
@@ -21,13 +21,27 @@ OpenCV on laptop
 Restricted-zone incident pipeline
 ```
 
-The current runner receives the live stream, detects people, and tracks temporary IDs. Later stages will be added one at a time: dwell/incident logic, configurable zone logic, evidence capture, incident understanding, and search.
+The current runner receives the live stream, detects people, tracks temporary IDs, confirms dwell incidents, and saves evidence clips under `incidents/`. The user reports completing real-world incident validation. Incident understanding and search follow in later milestones; configurable zones are outside V1.
+
+Evidence plays at 30 FPS with real elapsed timing: gaps repeat the last captured frame, and captures above 30 FPS are dropped. JPEG pre-roll reduces memory use; clips contain raw camera images without detection overlays. JSON records the full-frame zone, entry and confirmation times, clip path, and completion status; completed incidents also include exit, close, and duration fields. Exit means the first empty frame in the final empty interval. If recording stops while people remain or before ten empty seconds pass, JSON marks the clip incomplete. Previously saved incidents are left untouched.
+
+Incomplete JSON is saved before video writing starts. Successful completion replaces it with complete metadata. Startup or finalization failures preserve the incomplete record; failed metadata updates preserve the previous JSON. Storage errors are reported and can prevent new files from being saved.
+
+```text
+incidents/
+├── 1/
+│   ├── incident.mp4
+│   └── incident.json
+└── 2/
+    ├── incident.mp4
+    └── incident.json
+```
 
 See [MILESTONES.md](MILESTONES.md) for current order, pass conditions, and the next implementation slice.
 
 ## Code structure
 
-`main.py` wires components only. Runtime responsibilities are separated under `surveillance/`: configuration in `config.py`, shared data in `models.py`, camera input in `camera/`, YOLO/BoT-SORT in `perception/`, OpenCV display in `rendering/`, and frame orchestration in `application/`. Future zone, dwell, incident, evidence, and storage modules should follow the same boundary rule.
+`main.py` wires components only. Runtime responsibilities are separated under `surveillance/`: configuration in `config.py`, shared data in `models.py`, camera input in `camera/`, YOLO/BoT-SORT in `perception/`, OpenCV display in `rendering/`, and frame orchestration, dwell tracking, and evidence writing in `application/`. Future storage and configurable-zone modules should follow the same boundary rule.
 
 ## Setup
 
@@ -46,6 +60,18 @@ uv run python main.py
 
 The camera window opens on success. Press `Q` to close it. Change `DROIDCAM_INDEX` in `.env` if Windows assigns DroidCam another index.
 
+To evaluate a local MP4 through the same detection, tracking, incident, evidence, and display pipeline:
+
+```powershell
+uv run python main.py --video "clip.mp4"
+```
+
+Without `--video`, the runner uses DroidCam. MP4 mode needs no `DROIDCAM_INDEX`; `.env` still supplies the validated `PERSON_CONFIDENCE` setting. It processes every frame as fast as possible, using OpenCV's `CAP_PROP_POS_MSEC` decoder timestamps for dwell and evidence timing. Invalid or non-increasing timestamps are rejected, except for one invalid final frame after valid footage when the next decoder read reaches EOF. That frame is discarded with a console message and timing stays at the last valid position; there is no FPS fallback.
+
+MP4 metadata dates use the run-start time plus video position, not the original recording date. EOF or `Q` releases resources and saves active evidence with incomplete metadata; it does not invent post-roll footage.
+
 ## Design direction
+
+Run automated checks with `uv run --locked python -m unittest discover -s tests -v`. GitHub Actions runs the same checks on Windows for pushes and pull requests. These tests cover recording failures and camera/display wrappers; they do not establish real-world detection accuracy.
 
 Use coarse-to-fine video intelligence: cheap local perception first, selective deeper analysis only for confirmed incidents, and evidence-backed answers with timestamps.

@@ -1,74 +1,44 @@
 # Open Surveillance AI Handoff
 
-Read this file first in the next coding session, then read `AGENTS.md`.
+Read this file first in the next coding session, then read `AGENTS.md` and `MILESTONES.md`.
 
 ## Current status
 
-Project initialized on branch `master`. Repository had no prior files or commits.
+Milestones 0 and 1 are implemented. Detection, temporary display tracking, frame occupancy confirmation, and evidence capture are covered by unit and pipeline tests. The user reported real-world validation of the earlier per-person flow; the new frame grouping has not yet been checked with real-person footage.
 
-Created:
+Run the application from the repository root:
 
-- `AGENTS.md` — agent workflow rules.
-- `README.md` — problem statement, V1 boundary, setup direction.
-- `pyproject.toml` — Python 3.11 project dependencies.
-- `uv.lock` — resolved dependency lockfile.
-- `.gitignore` — Python, secrets, generated video/data exclusions.
-- `docs/skills-and-plugins.md` — required workflow skills and plugins.
-
-DroidCam, person-detection, and temporary tracking code is split under `surveillance/`: `camera/` owns capture, `perception/` owns YOLO/BoT-SORT, `rendering/` owns OpenCV display, `application/` owns the live loop, and `main.py` wires them. The runner detects COCO `person` objects, uses persistent BoT-SORT tracking, and draws green boxes, confidence, temporary IDs, and a people count. The entire camera frame is currently the restricted area; custom polygons or zone boxes are future work. Dependencies are installed through `uv`.
-
-## Settled decisions
-
-- Product: restricted-zone surveillance assistant.
-- V1 incident: tracked person enters a user-defined polygon and remains at least 2 seconds. Current temporary zone: entire camera frame.
-- Detection boxes are person overlays, not zone boundaries.
-- Track IDs are temporary per process, not face identities; they reset when the runner restarts.
-- Milestone 0: phone-camera streaming passed.
-- Camera source: Android phone using DroidCam as a Windows virtual webcam.
-- Connection: phone and laptop through USB; no cloud camera service.
-- First interface: CLI/OpenCV live window; no web UI.
-- Tooling: Python 3.11 + `uv`.
-
-## Camera checkpoint
-
-The DroidCam USB smoke test has passed on this machine:
-
-```text
-Android phone + DroidCam USB
-        -> OpenCV Media Foundation camera
-        -> live window on laptop
-        -> Q exits cleanly
+```powershell
+uv run python main.py
 ```
 
-Run `uv run python main.py` before starting a new video module. Verify moving phone frames, person detection, and the `People: N` label. A camera handle opening is not sufficient.
+For a local MP4, run `uv run python main.py --video "clip.mp4"`. This uses the same detection, tracking, incident, evidence, and display pipeline. No flag keeps DroidCam. MP4 mode needs no `DROIDCAM_INDEX`; `.env` still validates `PERSON_CONFIDENCE`.
 
-Use `MILESTONES.md` as the source of truth for the current implementation slice and scope guards.
+Press `Q` to exit. One confirmed full-frame incident produces one numbered folder under `incidents/`, containing `incident.mp4` and `incident.json`. Console reports frame confirmation after two occupied seconds, then reports the saved clip after ten empty seconds.
 
-## Configuration note
+## Incident behavior
 
-`pyproject.toml` intentionally has no configuration dependency. Copy `.env.example` to `.env`; use `DROIDCAM_INDEX=1` unless Windows assigns DroidCam another index.
+- The full camera frame is the restricted area.
+- YOLO detects people; BoT-SORT assigns temporary IDs that reset when the process restarts.
+- Confirm one frame incident after two uninterrupted occupied seconds. Any person detection counts, with or without a tracking ID; an empty frame before confirmation resets dwell.
+- Keep ten seconds of footage before first detection. After confirmation, start an empty timer on the first frame with nobody detected and finish after ten empty seconds.
+- Anyone returning before the empty deadline continues the current incident and clears that timer. At or after the deadline, the old incident finishes and new occupancy needs two seconds to confirm.
+- Multiple people, individual entrances/departures, and tracking-ID changes never split an occupied scene. The old per-person incident dictionary, 30-missed-frame incident grace, and multiple evidence writers are removed. BoT-SORT IDs remain display labels only.
+- MP4 uses 30 FPS: repeat the previous image across capture gaps and drop captures above 30 FPS. Evidence excludes display overlays.
+- JSON records full-frame zone, entry, confirmation, clip path, and completion. Incomplete JSON is saved before video startup; completion replaces it atomically after finalization succeeds. Startup/finalization failures retain incomplete information. Completed incidents include exit (first empty frame of the final vacancy), close, and duration. There is no person track_id or track_removed_at in new metadata; existing files are untouched. Early shutdown/EOF marks an active clip incomplete.
+- MP4 input processes every frame as fast as possible. Dwell and evidence use `CAP_PROP_POS_MSEC` decoder timestamps. After valid footage, one invalid final frame is discarded with a console message only if the next decoder read reaches EOF; timing stays at the last valid position. Invalid first-frame or intermediate timestamps remain errors, without an FPS fallback.
+- MP4 metadata dates use run-start time plus video position, not the original recording date. EOF or `Q` releases resources and saves active evidence incomplete without inventing post-roll footage.
 
-## Verification already completed
+## Validation status
 
-- `py -3.11` validated `pyproject.toml` as TOML.
-- `uv lock` resolved the project dependencies.
-- `uv lock --check` passed.
-- `git diff --check` passed.
+- Unit and pipeline suite: 69 tests passed, including frame occupancy/ID handoff, partial departures, empty deadline/return, sequential scene incidents, metadata recovery, camera/display/YOLO wrappers, pipeline exception cleanup, MP4 validation/replay, EOF/Q cleanup, and final-frame timestamp checks.
+- The scripted 30-second three-person regression produces one folder/video/JSON: two remain while a third enters/leaves. Its MP4 decodes 901 frames at 30 FPS and EOF marks the still-occupied incident incomplete.
+- Synthetic MP4 round-trip: passed at 30 FPS with elapsed duration preserved.
+- MP4 replay tests use generated footage and scripted detections. Two blank-frame CUDA calls and inference on the first two valid frames of the supplied MPG passed with the local model; both MPG frames returned no people. This verifies startup, not real-person tracking accuracy.
+- The user's MPG reproduced a final-frame timestamp reset from 15.28 seconds to zero. Source-only verification now delivers 382 valid frames, discards that invalid final frame, reaches EOF at the last valid position, and releases capture. The full detection/display run was not rerun after this fix.
+- Real-world validation: user reports complete. Clip count and case-by-case results were not recorded.
+- The currently supplied Meet_Crowd.mpg has 492 decodable frames and repeated intermediate decoder timestamps, including near its start. It still fails the deliberate strictly increasing timestamp rule; the earlier final-frame exception does not cover this file. A conversion or timestamp-policy decision is pending.
+- A Windows GitHub Actions test job was added; its locked test command is verified locally, but remote CI has not run in this session.
+- Picture-size handling remains excluded. The new approved frame rule explicitly closes at ten empty seconds, including when someone arrives at that deadline; the old per-person deadline logic is removed.
 
-The `python` command is not on PATH; use `py -3.11` or `uv run` on this machine.
-
-## Workflow for next session
-
-1. Read `HANDOFF.md` and `AGENTS.md`.
-2. Follow the required skills in `docs/skills-and-plugins.md`.
-3. Run the DroidCam smoke test before a video-related implementation.
-4. Add one minimal runnable check for non-trivial logic.
-5. Verify fresh command output before claiming completion.
-
-## Do not assume
-
-- The Windows camera index assigned to DroidCam.
-- USB/DroidCam connectivity.
-- GPU/CUDA availability.
-- That the stream works before a manual DroidCam preflight.
-- That later dwell, polygon-zone, VLM, or search requirements are finalized.
+Use `MILESTONES.md` as the source of truth for the current implementation slice and scope guards. Keep `DROIDCAM_INDEX` in the local `.env`; never commit it.
