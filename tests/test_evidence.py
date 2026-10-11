@@ -28,6 +28,107 @@ class FakeVideoWriter:
 
 
 class EvidenceRecorderTests(unittest.TestCase):
+    def test_failed_frame_encoding_does_not_poison_later_recording(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            writer = FakeVideoWriter()
+            recorder = EvidenceRecorder(Path(directory), lambda *args: writer)
+            self.addCleanup(recorder.close)
+            frame = np.zeros((4, 5, 3), dtype=np.uint8)
+            with patch("surveillance.application.evidence.cv2.imencode", return_value=(False, None)):
+                with self.assertRaisesRegex(RuntimeError, "encode frame"):
+                    recorder.buffer_frame(frame, 0)
+            recorder.buffer_frame(frame, 2)
+            recorder.start_incident(ConfirmedIncident(0, 2, 100, 102))
+            self.assertEqual(len(writer.frames), 1)
+            recorder.close()
+
+    def test_abandoned_pending_visit_stops_retaining_old_pre_roll(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            writer = FakeVideoWriter()
+            recorder = EvidenceRecorder(Path(directory), lambda *args: writer)
+            self.addCleanup(recorder.close)
+            for timestamp, value, pending in ((0, 0, 0), (20, 20, 0), (30, 30, None)):
+                recorder.buffer_frame(np.full((4, 5, 3), value, dtype=np.uint8), timestamp, pending)
+                if timestamp == 20:
+                    self.assertEqual([time for time, _ in recorder._history], [0, 20])
+            self.assertEqual([time for time, _ in recorder._history], [20, 30])
+            recorder.start_incident(ConfirmedIncident(30, 32, 130, 132))
+            self.assertEqual(float(writer.frames[0].mean()), 20)
+            recorder.close()
+
+    def test_recovery_after_failed_writer_open_uses_next_directory(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            failed, recovered = FakeVideoWriter(), FakeVideoWriter()
+            recorder = EvidenceRecorder(Path(directory), Mock(side_effect=[failed, recovered]))
+            self.addCleanup(recorder.close)
+            recorder.buffer_frame(np.zeros((4, 5, 3), dtype=np.uint8), 2)
+            incident = ConfirmedIncident(0, 2, 100, 102)
+            with patch.object(failed, "isOpened", return_value=False):
+                with self.assertRaises(RuntimeError):
+                    recorder.start_incident(incident)
+            path = recorder.start_incident(incident)
+            self.assertEqual(path.parent.name, "2")
+            self.assertFalse(json.loads((Path(directory) / "1" / "incident.json").read_text())["complete"])
+            self.assertEqual(len(recovered.frames), 1)
+            recorder.close()
+
+    def test_post_roll_poll_after_deadline_holds_last_frame_without_new_scene(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            writer = FakeVideoWriter()
+            recorder = EvidenceRecorder(Path(directory), lambda *args: writer)
+            self.addCleanup(recorder.close)
+            recorder.buffer_frame(np.zeros((4, 5, 3), dtype=np.uint8), 0)
+            incident = ConfirmedIncident(0, 2, 100, 102)
+            recorder.start_incident(incident)
+            recorder.write_active_frame(np.full((4, 5, 3), 20, dtype=np.uint8), 3, [])
+            completed = CompletedIncident(incident, 3, 103, 13, 113, 3)
+            recorder.write_active_frame(np.full((4, 5, 3), 255, dtype=np.uint8), 20, [completed])
+            recorder.finish_incident(completed)
+            self.assertEqual(len(writer.frames), 391)
+            self.assertEqual(float(writer.frames[-1].mean()), 20)
+            self.assertFalse(any(frame.mean() == 255 for frame in writer.frames))
+
+    def test_completed_metadata_survives_repeated_close(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            writer = FakeVideoWriter()
+            recorder = EvidenceRecorder(Path(directory), lambda *args: writer)
+            recorder.buffer_frame(np.zeros((4, 5, 3), dtype=np.uint8), 0)
+            incident = ConfirmedIncident(0, 2, 100, 102)
+            path = recorder.start_incident(incident)
+            recorder.finish_incident(CompletedIncident(incident, 3, 103, 13, 113, 3))
+            original = path.with_suffix(".json").read_bytes()
+            with patch.object(writer, "release") as release:
+                recorder.close()
+                recorder.close()
+            release.assert_not_called()
+            self.assertEqual(path.with_suffix(".json").read_bytes(), original)
+
+    def test_subframe_capture_updates_image_held_during_next_gap(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            writer = FakeVideoWriter()
+            recorder = EvidenceRecorder(Path(directory), lambda *args: writer)
+            self.addCleanup(recorder.close)
+            recorder.buffer_frame(np.zeros((4, 5, 3), dtype=np.uint8), 0)
+            recorder.start_incident(ConfirmedIncident(0, 2, 100, 102))
+            recorder.write_active_frame(np.full((4, 5, 3), 40, dtype=np.uint8), 0.01, [])
+            self.assertEqual(len(writer.frames), 1)
+            recorder.write_active_frame(np.full((4, 5, 3), 80, dtype=np.uint8), 0.1, [])
+            self.assertEqual([float(frame.mean()) for frame in writer.frames], [0, 40, 40, 80])
+            recorder.close()
+
+    def test_incomplete_metadata_contains_only_available_times(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            recorder = EvidenceRecorder(Path(directory), FakeVideoWriter)
+            recorder.buffer_frame(np.zeros((4, 5, 3), dtype=np.uint8), 0)
+            path = recorder.start_incident(ConfirmedIncident(0, 2, 100.25, 102.5))
+            recorder.close()
+            metadata = json.loads(path.with_suffix(".json").read_text())
+            self.assertEqual(metadata["entry_time"], "1970-01-01T00:01:40.250000+00:00")
+            self.assertEqual(metadata["confirmation_time"], "1970-01-01T00:01:42.500000+00:00")
+            self.assertNotIn("exit_time", metadata)
+            self.assertNotIn("closed_at", metadata)
+            self.assertNotIn("duration_seconds", metadata)
+
     def test_startup_failures_keep_incomplete_metadata(self) -> None:
         for failure in ("no_frames", "first_decode", "later_decode", "writer_open", "writer_creation", "write"):
             with self.subTest(failure=failure), tempfile.TemporaryDirectory() as directory:

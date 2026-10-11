@@ -4,7 +4,7 @@ Read this file first in the next coding session, then read `AGENTS.md` and `MILE
 
 ## Current status
 
-Milestones 0 and 1 are implemented. Detection, temporary display tracking, frame occupancy confirmation, and evidence capture are covered by unit and pipeline tests. The user reported real-world validation of the earlier per-person flow; the new frame grouping has not yet been checked with real-person footage.
+Version 1.0.0 freezes Milestones 0 and 1, including local MP4 evaluation. Detection, temporary display tracking, frame occupancy confirmation, and evidence capture are covered by unit and pipeline tests. The frame-based architecture is current; real-person validation remains pending, as confirmed by the user for this release. VLM analysis, search, and configurable zones are future scope.
 
 Run the application from the repository root:
 
@@ -31,14 +31,15 @@ Press `Q` to exit. One confirmed full-frame incident produces one numbered folde
 
 ## Validation status
 
-- Unit and pipeline suite: 69 tests passed, including frame occupancy/ID handoff, partial departures, empty deadline/return, sequential scene incidents, metadata recovery, camera/display/YOLO wrappers, pipeline exception cleanup, MP4 validation/replay, EOF/Q cleanup, and final-frame timestamp checks.
+- V1 release verification: 96 tests passed locally with `uv run --locked python -m unittest discover -s tests -v`. Added 27 regressions across incident timing, repeated visits/returns, evidence recovery/resampling, cleanup boundaries, media timestamps, and CLI fail-fast behavior. These include frame occupancy/ID handoff, partial departures, empty deadline/return, sequential scene incidents, metadata recovery, camera/display/YOLO wrappers, MP4 replay, EOF/Q cleanup, and final-frame timestamp checks.
+- Release startup smoke: CUDA was available and two blank-frame tracking calls returned zero detections with the local model. This checks startup only; real-person accuracy remains pending.
 - The scripted 30-second three-person regression produces one folder/video/JSON: two remain while a third enters/leaves. Its MP4 decodes 901 frames at 30 FPS and EOF marks the still-occupied incident incomplete.
 - Synthetic MP4 round-trip: passed at 30 FPS with elapsed duration preserved.
 - MP4 replay tests use generated footage and scripted detections. Two blank-frame CUDA calls and inference on the first two valid frames of the supplied MPG passed with the local model; both MPG frames returned no people. This verifies startup, not real-person tracking accuracy.
 - The user's MPG reproduced a final-frame timestamp reset from 15.28 seconds to zero. Source-only verification now delivers 382 valid frames, discards that invalid final frame, reaches EOF at the last valid position, and releases capture. The full detection/display run was not rerun after this fix.
-- Real-world validation: user reports complete. Clip count and case-by-case results were not recorded.
-- The currently supplied Meet_Crowd.mpg has 492 decodable frames and repeated intermediate decoder timestamps, including near its start. It still fails the deliberate strictly increasing timestamp rule; the earlier final-frame exception does not cover this file. A conversion or timestamp-policy decision is pending.
-- A Windows GitHub Actions test job was added; its locked test command is verified locally, but remote CI has not run in this session.
+- Real-person validation of the current architecture: pending. Earlier user validation reports concern the preceding flow; no current accuracy measurements are claimed.
+- The supplied Meet_Crowd.mpg has repeated intermediate decoder timestamps, including near its start. V1 deliberately rejects it under the strictly increasing timestamp rule; the final-frame exception does not cover this file. The user approved keeping this rule and documenting external conversion to valid-timestamp MP4 as the preparation step.
+- Windows GitHub Actions passed on the pre-release commit b7648dc8aca80ec4b16cd060b78eeef724dc43c7. Recheck CI for the final release commit before publication.
 - Picture-size handling remains excluded. The new approved frame rule explicitly closes at ten empty seconds, including when someone arrives at that deadline; the old per-person deadline logic is removed.
 
 Use `MILESTONES.md` as the source of truth for the current implementation slice and scope guards. Keep `DROIDCAM_INDEX` in the local `.env`; never commit it.

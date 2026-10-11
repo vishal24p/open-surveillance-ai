@@ -140,6 +140,46 @@ class VideoFileSourceTests(unittest.TestCase):
 
         self.capture.release.assert_called_once_with()
 
+    def test_first_frame_can_begin_at_nonzero_media_time(self) -> None:
+        self.capture.get.return_value = 1250.5
+        source = VideoFileSource(self.path)
+        self.addCleanup(source.close)
+        self.assertIsNone(source.position_seconds)
+        self.assertTrue(source.read()[0])
+        self.assertEqual(source.position_seconds, 1.2505)
+
+    def test_fractional_timestamps_are_preserved_without_fps_rounding(self) -> None:
+        self.capture.get.side_effect = [0, 33.3667, 83.5]
+        source = VideoFileSource(self.path)
+        self.addCleanup(source.close)
+        for expected in (0, 0.0333667, 0.0835):
+            self.assertTrue(source.read()[0])
+            self.assertAlmostEqual(source.position_seconds, expected)
+
+    def test_invalid_intermediate_frame_is_rejected_even_if_next_frame_is_valid(self) -> None:
+        frame = np.zeros((4, 4, 3), dtype=np.uint8)
+        self.capture.read.side_effect = [(True, frame)] * 3
+        self.capture.get.side_effect = [100, 100, 200]
+        source = VideoFileSource(self.path)
+        self.addCleanup(source.close)
+        source.read()
+        with self.assertRaisesRegex(RuntimeError, "strictly increasing"):
+            source.read()
+        self.assertEqual(source.position_seconds, 0.1)
+        self.assertEqual(self.capture.read.call_count, 3)
+
+    def test_repeated_eof_does_not_request_more_timestamps(self) -> None:
+        frame = np.zeros((4, 4, 3), dtype=np.uint8)
+        self.capture.read.side_effect = [(True, frame), (False, None), (False, None)]
+        self.capture.get.return_value = 100
+        source = VideoFileSource(self.path)
+        self.addCleanup(source.close)
+        source.read()
+        self.assertEqual(source.read(), (False, None))
+        self.assertEqual(source.read(), (False, None))
+        self.assertEqual(source.position_seconds, 0.1)
+        self.capture.get.assert_called_once_with(cv2.CAP_PROP_POS_MSEC)
+
 
 class VideoFileDecodeTests(unittest.TestCase):
     def test_generated_mp4_decodes_all_frames_with_media_time(self) -> None:

@@ -9,6 +9,76 @@ def person(track_id: int | None) -> TrackedDetection:
 
 
 class IncidentTrackerTests(unittest.TestCase):
+    def test_fractional_entry_keeps_exact_dwell_boundary(self) -> None:
+        tracker = IncidentTracker()
+        tracker.update([person(1)], 0.25, 1000.25)
+        self.assertEqual(tracker.update([person(1)], 2.249, 1002.249), ([], []))
+        confirmed, _ = tracker.update([person(1)], 2.25, 1002.25)
+        self.assertEqual(confirmed[0].started_at, 0.25)
+        self.assertEqual(confirmed[0].confirmed_at, 2.25)
+
+    def test_empty_frame_at_dwell_boundary_does_not_confirm(self) -> None:
+        tracker = IncidentTracker()
+        tracker.update([person(1)], 0, 1000)
+        self.assertEqual(tracker.update([], 2, 1002), ([], []))
+        self.assertIsNone(tracker.pending_started_at)
+
+    def test_repeated_short_visits_never_accumulate_dwell(self) -> None:
+        tracker = IncidentTracker()
+        for start in (0, 3, 6):
+            self.assertEqual(tracker.update([person(None)], start, 1000 + start), ([], []))
+            self.assertEqual(tracker.update([], start + 1.5, 1001.5 + start), ([], []))
+        self.assertIsNone(tracker.pending_started_at)
+
+    def test_repeated_occupied_updates_emit_confirmation_only_once(self) -> None:
+        tracker = IncidentTracker()
+        tracker.update([person(1)], 0, 1000)
+        confirmed, _ = tracker.update([person(1)], 2, 1002)
+        self.assertEqual(len(confirmed), 1)
+        for now in (2, 2.1, 50):
+            self.assertEqual(tracker.update([person(None)], now, 1000 + now), ([], []))
+
+    def test_fractional_empty_deadline_closes_at_exact_boundary(self) -> None:
+        tracker = IncidentTracker()
+        tracker.update([person(1)], 0, 1000)
+        tracker.update([person(1)], 2, 1002)
+        tracker.update([], 3.25, 1003.25)
+        self.assertEqual(tracker.update([], 13.249, 1013.249), ([], []))
+        _, completed = tracker.update([], 13.25, 1013.25)
+        self.assertEqual(completed[0].closed_at, 13.25)
+        self.assertEqual(completed[0].duration_seconds, 3.25)
+
+    def test_late_poll_preserves_original_exit_and_deadline_epochs(self) -> None:
+        tracker = IncidentTracker()
+        tracker.update([person(1)], 0, 1000)
+        tracker.update([person(1)], 2, 1002)
+        tracker.update([], 3, 1003)
+        _, completed = tracker.update([], 99, 9999)
+        self.assertEqual(completed[0].exit_epoch, 1003)
+        self.assertEqual(completed[0].closed_epoch, 1013)
+        self.assertEqual(completed[0].closed_at, 13)
+
+    def test_multiple_returns_extend_same_incident_until_final_empty_period(self) -> None:
+        tracker = IncidentTracker()
+        tracker.update([person(1)], 0, 1000)
+        confirmed, _ = tracker.update([person(1)], 2, 1002)
+        for now, detections in ((3, []), (12, [person(None)]), (13, []), (22, [person(9)]), (23, [])):
+            self.assertEqual(tracker.update(detections, now, 1000 + now), ([], []))
+        _, completed = tracker.update([], 33, 1033)
+        self.assertEqual(completed[0].incident, confirmed[0])
+        self.assertEqual(completed[0].exit_at, 23)
+        self.assertEqual(completed[0].duration_seconds, 23)
+
+    def test_wall_clock_jump_does_not_change_dwell_or_post_roll(self) -> None:
+        tracker = IncidentTracker()
+        tracker.update([person(1)], 0, 1000)
+        confirmed, _ = tracker.update([person(1)], 2, 500)
+        self.assertEqual(confirmed[0].confirmed_epoch, 500)
+        tracker.update([], 3, 501)
+        _, completed = tracker.update([], 13, 9000)
+        self.assertEqual(completed[0].closed_epoch, 511)
+        self.assertEqual(completed[0].duration_seconds, 3)
+
     def test_confirms_after_two_occupied_seconds(self) -> None:
         tracker = IncidentTracker()
         self.assertIsNone(tracker.pending_started_at)

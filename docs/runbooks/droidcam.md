@@ -16,11 +16,11 @@ Prove that Android phone video reaches OpenCV and the current person-detection r
 
 4. Confirm `Surveillance` window shows moving phone video, person boxes with temporary IDs when people are visible, and `People: N`. Press `Q` to close it.
 
-To check incident recording, leave a tracked person visible for at least two seconds. The console reports confirmation, then reports the saved clip after the track is removed and the ten-second post-roll completes. Each confirmed incident creates a numbered folder under `incidents/` containing `incident.mp4` and `incident.json`. A same-track return during post-roll continues the same clip; a later incident creates another folder.
+To check incident recording, keep any people detected for at least two uninterrupted seconds. The console reports confirmation, then reports the saved clip after ten empty seconds. Each confirmed frame incident creates a numbered folder under `incidents/` containing `incident.mp4` and `incident.json`. Any person returning before the empty deadline continues the same clip; a return at or after the deadline requires a new two-second dwell and creates another folder.
 
 ## Pass
 
-The user reports completing real-world validation. The repository does not record a clip count or case-by-case results.
+Real-person validation of the current frame-based architecture is pending. Earlier validation reports concern the preceding flow; they do not establish this release's detector accuracy.
 
 - Phone image changes when phone moves.
 - No green or blank window.
@@ -28,8 +28,9 @@ The user reports completing real-world validation. The repository does not recor
 - The same person keeps the same temporary ID across nearby frames.
 - `People: N` appears in the top-right.
 - `Q` closes window.
-- A confirmed track produces `incident.mp4` and `incident.json` in its own numbered `incidents/` folder after final track removal plus ten seconds.
-- A same-track return during post-roll stays in the current incident and restarts the post-roll after its next exit.
+- A confirmed occupied frame produces `incident.mp4` and `incident.json` in its own numbered `incidents/` folder after ten empty seconds.
+- Any person returning before the empty deadline stays in the current incident and clears the empty timer.
+- Two people staying while a third enters/leaves produce one incident and clip; temporary IDs never split it.
 
 Opening a camera is not a pass. OpenCV must successfully read real frames.
 
@@ -45,6 +46,6 @@ Opening a camera is not a pass. OpenCV must successfully read real frames.
 
 - Use `cv2.CAP_MSMF`; do not revert to `cv2.CAP_DSHOW` for DroidCam numeric indexes.
 - Person detection, tracking, dwell confirmation, and evidence capture exist. Validate live camera and incident behavior on the target machine.
-- V1 restricted area is the entire camera frame. The pre-roll is ten seconds before first detection; dwell confirms after two seconds. The tracker preserves tracks through 30 missing frames and removes them on the next missed frame, then the ten-second post-roll starts. Detection boxes are overlays only; configurable zones are future work.
+- V1 restricted area is the entire camera frame. The pre-roll is ten seconds before first detection; dwell confirms after two uninterrupted occupied seconds. The first empty frame starts the ten-second post-roll. Detection boxes and IDs are overlays only; configurable zones are future work.
 - Evidence MP4s use 30 FPS with elapsed-time playback. Gaps repeat the previous image; captures above 30 FPS are dropped. Early shutdown saves incomplete metadata.
 - Keep `DROIDCAM_INDEX` in local `.env`, never source control.

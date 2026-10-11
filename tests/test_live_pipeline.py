@@ -15,6 +15,75 @@ from surveillance.models import TrackedDetection
 
 
 class LivePipelineTests(unittest.TestCase):
+    def test_short_visit_replay_creates_no_evidence_directory(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            source, tracker, renderer = Mock(), Mock(), Mock()
+            frame = np.zeros((16, 16, 3), dtype=np.uint8)
+            source.read.side_effect = [(True, frame)] * 3 + [(False, None)]
+            tracker.track.side_effect = [[TrackedDetection(0, 0, 4, 5, 0.9, None)], [], []]
+            renderer.show.return_value = True
+            recorder = EvidenceRecorder(Path(directory) / "incidents")
+            clock = iter(((0, 1000), (1, 1001), (20, 1020)))
+            LivePipeline(source, tracker, renderer, IncidentTracker(), recorder, clock=clock.__next__).run()
+            self.assertFalse((Path(directory) / "incidents").exists())
+            source.close.assert_called_once()
+            renderer.close.assert_called_once()
+
+    def test_immediate_eof_does_not_process_frame_or_clock(self) -> None:
+        source, tracker, renderer, incidents, evidence = [Mock() for _ in range(5)]
+        source.read.return_value = (False, None)
+        clock = Mock()
+        LivePipeline(source, tracker, renderer, incidents, evidence, clock=clock).run()
+        clock.assert_not_called()
+        tracker.track.assert_not_called()
+        incidents.update.assert_not_called()
+        evidence.buffer_frame.assert_not_called()
+        renderer.show.assert_not_called()
+        for resource in (source, renderer, evidence):
+            resource.close.assert_called_once()
+
+    def test_q_stops_before_reading_another_frame(self) -> None:
+        source, tracker, renderer, incidents, evidence = [Mock() for _ in range(5)]
+        source.read.return_value = (True, np.zeros((4, 5, 3), dtype=np.uint8))
+        tracker.track.return_value = []
+        incidents.update.return_value = ([], [])
+        incidents.pending_started_at = None
+        renderer.show.return_value = False
+        LivePipeline(source, tracker, renderer, incidents, evidence, clock=lambda: (0, 1000)).run()
+        source.read.assert_called_once()
+        evidence.buffer_frame.assert_called_once()
+        for resource in (source, renderer, evidence):
+            resource.close.assert_called_once()
+
+    def test_incident_and_evidence_failures_close_all_resources(self) -> None:
+        for failure in ("update", "buffer_frame", "write_active_frame", "start_incident", "finish_incident"):
+            with self.subTest(failure=failure):
+                source, tracker, renderer, incidents, evidence = [Mock() for _ in range(5)]
+                source.read.return_value = (True, np.zeros((4, 5, 3), dtype=np.uint8))
+                tracker.track.return_value = []
+                confirmed = [Mock(started_at=0)] if failure == "start_incident" else []
+                completed = [Mock()] if failure == "finish_incident" else []
+                incidents.update.return_value = (confirmed, completed)
+                incidents.pending_started_at = None
+                target = incidents if failure == "update" else evidence
+                getattr(target, failure).side_effect = RuntimeError(failure)
+                with self.assertRaisesRegex(RuntimeError, failure):
+                    LivePipeline(source, tracker, renderer, incidents, evidence, clock=lambda: (2, 1002)).run()
+                for resource in (source, renderer, evidence):
+                    resource.close.assert_called_once()
+
+    def test_completion_finishes_before_next_confirmation_starts(self) -> None:
+        source, tracker, renderer, evidence = [Mock() for _ in range(4)]
+        source.read.side_effect = [(True, np.zeros((4, 5, 3), dtype=np.uint8))] * 6 + [(False, None)]
+        person = TrackedDetection(0, 0, 4, 5, 0.9, None)
+        tracker.track.side_effect = [[person], [person], [], [person], [person], []]
+        renderer.show.return_value = True
+        clock = iter((now, 1000 + now) for now in (0, 2, 3, 13, 15, 16))
+        LivePipeline(source, tracker, renderer, IncidentTracker(), evidence, clock=clock.__next__).run()
+        operations = [call[0] for call in evidence.mock_calls if call[0] in ("start_incident", "finish_incident")]
+        self.assertEqual(operations, ["start_incident", "finish_incident", "start_incident"])
+        self.assertEqual(evidence.start_incident.call_args_list[1].args[0].started_at, 13)
+
     def test_thirty_second_scene_with_individual_arrivals_has_one_incomplete_clip(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             source, tracker, renderer = Mock(), Mock(), Mock()

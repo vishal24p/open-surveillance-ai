@@ -1,7 +1,7 @@
 [project]
 name = "open-surveillance-ai"
-version = "0.2.0"
-description = "Student-sized local-first restricted-zone surveillance assistant"
+version = "1.0.0"
+description = "Local-first full-frame person incident detection and evidence recording"
 requires-python = ">=3.11,<3.12"
 dependencies = [
     "opencv-python>=4.10,<5",

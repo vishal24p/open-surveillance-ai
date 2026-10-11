@@ -1,6 +1,6 @@
 # Open Surveillance AI
 
-Student-sized video intelligence project for local-first restricted-zone monitoring.
+Version 1.0.0: local-first full-frame person incident detection and evidence recording.
 
 ## Problem
 
@@ -21,7 +21,7 @@ OpenCV on laptop
 Restricted-zone incident pipeline
 ```
 
-The current runner receives the live stream, detects people, tracks temporary IDs, confirms dwell incidents, and saves evidence clips under `incidents/`. The user reports completing real-world incident validation. Incident understanding and search follow in later milestones; configurable zones are outside V1.
+The current runner receives the live stream, detects people, tracks temporary IDs, confirms dwell incidents, and saves evidence clips under `incidents/`. V1 freezes this frame-based architecture. Real-person validation of this architecture is pending. V1 uses no VLM; incident understanding, search, and configurable zones remain future work.
 
 Evidence plays at 30 FPS with real elapsed timing: gaps repeat the last captured frame, and captures above 30 FPS are dropped. JPEG pre-roll reduces memory use; clips contain raw camera images without detection overlays. JSON records the full-frame zone, entry and confirmation times, clip path, and completion status; completed incidents also include exit, close, and duration fields. Exit means the first empty frame in the final empty interval. If recording stops while people remain or before ten empty seconds pass, JSON marks the clip incomplete. Previously saved incidents are left untouched.
 
@@ -45,10 +45,10 @@ See [MILESTONES.md](MILESTONES.md) for current order, pass conditions, and the n
 
 ## Setup
 
-Requirements: Windows, Python 3.11, and `uv`.
+Requirements: Windows, Python 3.11, `uv`, and an NVIDIA GPU with a driver compatible with the locked CUDA 13.0 PyTorch build. The current tracker requires CUDA; CPU-only execution is unsupported. Run from the repository root. Ultralytics loads `yolo26s.pt` there and downloads the weights on first use if absent, requiring internet access; weights are not included in the release source archive.
 
 ```powershell
-uv sync
+uv sync --locked
 ```
 
 Install DroidCam on the phone and its Windows client. Connect the phone by USB, enable DroidCam's USB connection, then run:
@@ -69,6 +69,13 @@ uv run python main.py --video "clip.mp4"
 Without `--video`, the runner uses DroidCam. MP4 mode needs no `DROIDCAM_INDEX`; `.env` still supplies the validated `PERSON_CONFIDENCE` setting. It processes every frame as fast as possible, using OpenCV's `CAP_PROP_POS_MSEC` decoder timestamps for dwell and evidence timing. Invalid or non-increasing timestamps are rejected, except for one invalid final frame after valid footage when the next decoder read reaches EOF. That frame is discarded with a console message and timing stays at the last valid position; there is no FPS fallback.
 
 MP4 metadata dates use the run-start time plus video position, not the original recording date. EOF or `Q` releases resources and saves active evidence with incomplete metadata; it does not invent post-roll footage.
+
+## Known V1 limitations
+
+- Real-person validation is pending. Automated tests use scripted detections and synthetic footage; they do not measure missed people, false alarms, or tracking accuracy.
+- Every part of the frame is restricted. Camera movement, occlusion, and detector misses can affect occupancy; tracking IDs do not provide an incident grace period.
+- Videos need finite, non-negative, strictly increasing decoder timestamps. The supplied `Meet_Crowd.mpg` has repeated intermediate timestamps and is rejected. Convert such footage to an MP4 with valid timestamps before evaluation; V1 has no timestamp fallback or built-in conversion. Only one invalid final frame after valid footage may be discarded when the next decoder read reaches EOF.
+- EOF or early shutdown can leave incomplete evidence. Clips depend on available captured footage and writable storage; MP4 dates refer to evaluation time, not the source recording date.
 
 ## Design direction
 

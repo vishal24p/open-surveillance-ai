@@ -4,6 +4,12 @@
 
 Detect a person in the restricted area, confirm at least two seconds of presence, save evidence, then make confirmed incidents understandable and searchable. In V1, the entire camera frame is the restricted area.
 
+## V1 freeze — 1.0.0
+
+Milestones 0 and 1, including local MP4 evaluation, define the frozen release scope. The frame-based architecture is current: any-person occupancy controls incidents; temporary person IDs only label detections. V1 contains no VLM. Milestones 2–4 and configurable zones are future work, not release requirements. Real-person validation remains pending and is documented as a release limitation.
+
+Keep strict decoder timestamps in V1. The supplied `Meet_Crowd.mpg` repeats intermediate timestamps and is rejected; conversion to valid-timestamp MP4 footage is an external preparation step. Do not silently add an FPS fallback or broaden the final-frame exception.
+
 ## Milestone 0 — Live phone camera ✅
 
 Android phone → DroidCam USB → Windows → OpenCV live window.
