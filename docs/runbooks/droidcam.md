@@ -14,7 +14,7 @@ Prove that Android phone video reaches OpenCV and the current person-detection r
    uv run python main.py
    ```
 
-4. Confirm `DroidCam` window shows moving phone video, person boxes with temporary IDs when people are visible, and `People: N`. Press `Q` to close it.
+4. Confirm `Surveillance` window shows moving phone video, person boxes with temporary IDs when people are visible, and `People: N`. Press `Q` to close it.
 
 To check incident recording, leave a tracked person visible for at least two seconds. The console reports confirmation, then reports the saved clip after the track is removed and the ten-second post-roll completes. Each confirmed incident creates a numbered folder under `incidents/` containing `incident.mp4` and `incident.json`. A same-track return during post-roll continues the same clip; a later incident creates another folder.
 

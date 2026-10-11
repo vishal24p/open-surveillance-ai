@@ -28,6 +28,12 @@ Pass: incident output includes the full-frame zone, track ID, entry/confirmation
 
 The dwell and evidence logic has unit and pipeline coverage. The user reports the real-world validation is complete.
 
+### Evaluation extension — Local MP4 input
+
+Run local MP4 files through the same detection, tracking, incident, and evidence pipeline using `uv run python main.py --video "clip.mp4"`. No flag keeps DroidCam. Use video timestamps and process frames as fast as possible so dwell and evidence timing do not depend on processing speed. At end of file, preserve available evidence and mark unfinished incidents incomplete; do not invent post-roll footage.
+
+Pass: repeated footage has the same video-time incident timeline, MP4 mode does not require a camera index, and EOF releases capture, display, and evidence resources. MP4 calendar timestamps use run-start time plus video position; they do not represent the original recording date.
+
 ## Milestone 2 — Incident understanding
 
 Goal: explain confirmed evidence clips without using a VLM as the security trigger.

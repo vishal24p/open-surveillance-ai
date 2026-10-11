@@ -3,25 +3,28 @@ from time import monotonic, time
 
 
 class LivePipeline:
-    def __init__(self, source, tracker, renderer, incidents, evidence) -> None:
+    def __init__(self, source, tracker, renderer, incidents, evidence, clock=None) -> None:
         self._source = source
         self._tracker = tracker
         self._renderer = renderer
         self._incidents = incidents
         self._evidence = evidence
+        self._clock = clock
 
     def run(self) -> None:
-        print("DroidCam connected. Press Q to stop.")
+        print("Video source opened. Press Q to stop.")
         try:
             while True:
                 ok, frame = self._source.read()
                 if not ok:
-                    print("Lost DroidCam video.")
+                    print("Video source ended or disconnected.")
                     break
 
                 raw_frame = frame.copy()
-                now = monotonic()
-                epoch = time()
+                if self._clock is None:
+                    now, epoch = monotonic(), time()
+                else:
+                    now, epoch = self._clock()
                 detections = self._tracker.track(frame)
                 confirmed, completed = self._incidents.update(
                     detections,

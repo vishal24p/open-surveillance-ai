@@ -58,6 +58,16 @@ uv run python main.py
 
 The camera window opens on success. Press `Q` to close it. Change `DROIDCAM_INDEX` in `.env` if Windows assigns DroidCam another index.
 
+To evaluate a local MP4 through the same detection, tracking, incident, evidence, and display pipeline:
+
+```powershell
+uv run python main.py --video "clip.mp4"
+```
+
+Without `--video`, the runner uses DroidCam. MP4 mode needs no `DROIDCAM_INDEX`; `.env` still supplies the validated `PERSON_CONFIDENCE` setting. It processes every frame as fast as possible, using OpenCV's `CAP_PROP_POS_MSEC` decoder timestamps for dwell and evidence timing. Invalid or non-increasing timestamps are rejected; there is no FPS fallback.
+
+MP4 metadata dates use the run-start time plus video position, not the original recording date. EOF or `Q` releases resources and saves active evidence with incomplete metadata; it does not invent post-roll footage.
+
 ## Design direction
 
 Use coarse-to-fine video intelligence: cheap local perception first, selective deeper analysis only for confirmed incidents, and evidence-backed answers with timestamps.
