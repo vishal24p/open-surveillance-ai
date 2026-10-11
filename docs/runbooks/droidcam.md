@@ -16,9 +16,11 @@ Prove that Android phone video reaches OpenCV and the current person-detection r
 
 4. Confirm `DroidCam` window shows moving phone video, person boxes with temporary IDs when people are visible, and `People: N`. Press `Q` to close it.
 
-To check incident recording, leave a tracked person visible for at least two seconds. The console reports confirmation, then reports the saved clip after the track is removed and the ten-second post-roll completes. MP4 clips and JSON metadata are written under `incidents/`.
+To check incident recording, leave a tracked person visible for at least two seconds. The console reports confirmation, then reports the saved clip after the track is removed and the ten-second post-roll completes. Each confirmed incident creates a numbered folder under `incidents/` containing `incident.mp4` and `incident.json`. A same-track return during post-roll continues the same clip; a later incident creates another folder.
 
 ## Pass
+
+The user reports completing real-world validation. The repository does not record a clip count or case-by-case results.
 
 - Phone image changes when phone moves.
 - No green or blank window.
@@ -26,7 +28,7 @@ To check incident recording, leave a tracked person visible for at least two sec
 - The same person keeps the same temporary ID across nearby frames.
 - `People: N` appears in the top-right.
 - `Q` closes window.
-- A confirmed track produces an MP4 clip and JSON metadata under `incidents/` after final track removal plus ten seconds.
+- A confirmed track produces `incident.mp4` and `incident.json` in its own numbered `incidents/` folder after final track removal plus ten seconds.
 - A same-track return during post-roll stays in the current incident and restarts the post-roll after its next exit.
 
 Opening a camera is not a pass. OpenCV must successfully read real frames.

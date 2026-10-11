@@ -27,6 +27,29 @@ class FakeVideoWriter:
 
 
 class EvidenceRecorderTests(unittest.TestCase):
+    def test_fresh_recorder_preserves_existing_incident_evidence(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            output_dir = Path(directory)
+            existing_dir = output_dir / "1"
+            existing_dir.mkdir()
+            existing_video = existing_dir / "incident.mp4"
+            existing_metadata = existing_dir / "incident.json"
+            existing_video.write_bytes(b"previous incident video")
+            existing_metadata.write_bytes(b'{"track_id": 7, "complete": true}')
+            writer = FakeVideoWriter()
+            factory = Mock(return_value=writer)
+            recorder = EvidenceRecorder(output_dir, factory)
+            recorder.buffer_frame(np.zeros((4, 5, 3), dtype=np.uint8), 2)
+
+            video_path = recorder.start_incident(ConfirmedIncident(7, 0, 2, 100, 102))
+            recorder.close()
+
+            self.assertEqual(video_path, output_dir / "2" / "incident.mp4")
+            self.assertEqual(factory.call_args.args[0], str(video_path))
+            self.assertTrue(video_path.with_suffix(".json").is_file())
+            self.assertEqual(existing_video.read_bytes(), b"previous incident video")
+            self.assertEqual(existing_metadata.read_bytes(), b'{"track_id": 7, "complete": true}')
+
     def test_pre_roll_decodes_one_frame_before_writer_creation(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             frame = np.zeros((4, 5, 3), dtype=np.uint8)
@@ -99,6 +122,8 @@ class EvidenceRecorderTests(unittest.TestCase):
 
             incident = ConfirmedIncident(7, 20, 22, 1_700_000_000, 1_700_000_002)
             video_path = recorder.start_incident(incident)
+            self.assertEqual(video_path.parent.name, "1")
+            self.assertEqual(video_path.name, "incident.mp4")
             self.assertEqual(len(writers[0].frames), 361)
             self.assertAlmostEqual(float(writers[0].frames[0].mean()), 10, delta=1)
 

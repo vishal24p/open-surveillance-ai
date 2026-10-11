@@ -39,7 +39,7 @@ class LivePipelineTests(unittest.TestCase):
             self.assertEqual(saved_frames[-1], 54)
             self.assertNotIn(255, saved_frames)
             self.assertEqual(len(saved_frames), 1621)
-            metadata = json.loads(next(Path(directory).glob("*.json")).read_text(encoding="utf-8"))
+            metadata = json.loads(next(Path(directory).rglob("*.json")).read_text(encoding="utf-8"))
             self.assertTrue(metadata["complete"])
             self.assertEqual(metadata["duration_seconds"], 3)
             writer.release.assert_called_once()

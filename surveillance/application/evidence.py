@@ -58,10 +58,18 @@ class EvidenceRecorder:
 
     def start_incident(self, incident: ConfirmedIncident) -> Path:
         self._output_dir.mkdir(parents=True, exist_ok=True)
+        number = 1
+        while True:
+            incident_dir = self._output_dir / str(number)
+            try:
+                incident_dir.mkdir()
+                break
+            except FileExistsError:
+                number += 1
         stamp = datetime.fromtimestamp(
             incident.started_epoch, timezone.utc
         ).strftime("%Y%m%dT%H%M%S%fZ")
-        video_path = self._output_dir / f"incident_{stamp}_track_{incident.track_id}.mp4"
+        video_path = incident_dir / "incident.mp4"
         buffered = [
             (timestamp, data)
             for timestamp, data in self._history

@@ -6,7 +6,7 @@ Student-sized video intelligence project for local-first restricted-zone monitor
 
 A camera watches an area continuously, but a person cannot monitor it all the time. The system should detect a person in the restricted area, confirm the intrusion, preserve evidence, and eventually make incidents searchable. In V1, the entire camera frame is the restricted area.
 
-V1 rule: the entire camera frame is the restricted area. The runner detects people anywhere in that frame, BoT-SORT assigns temporary IDs, and a track seen for two seconds confirms an incident. It saves a clip from ten seconds before first detection through ten seconds after final track removal. A same-track return during post-roll continues the incident without another dwell. Green boxes are detection overlays, not a zone boundary. Configurable zones may come in a future version.
+V1 rule: the entire camera frame is the restricted area. The runner detects people anywhere in that frame, BoT-SORT assigns temporary IDs, and a track seen for two seconds confirms an incident. Every confirmed incident gets its own numbered folder under `incidents/`, with `incident.mp4` and `incident.json` inside. The clip includes footage from ten seconds before first detection through ten seconds after final track removal. A same-track return during post-roll continues that incident without another dwell. Green boxes are detection overlays, not a zone boundary. Configurable zones may come in a future version.
 
 ## V1 boundary
 
@@ -21,9 +21,19 @@ OpenCV on laptop
 Restricted-zone incident pipeline
 ```
 
-The current runner receives the live stream, detects people, tracks temporary IDs, confirms dwell incidents, and saves evidence clips under `incidents/`. Validate incident behavior on 10–20 real clips before treating Milestone 1 as complete. Incident understanding and search follow in later milestones; configurable zones are outside V1.
+The current runner receives the live stream, detects people, tracks temporary IDs, confirms dwell incidents, and saves evidence clips under `incidents/`. The user reports completing real-world incident validation. Incident understanding and search follow in later milestones; configurable zones are outside V1.
 
-Evidence plays at 30 FPS with real elapsed timing: gaps repeat the last captured frame, and captures above 30 FPS are dropped. JPEG pre-roll reduces memory use; clips contain raw camera images without detection overlays. If recording stops early, JSON marks the clip incomplete.
+Evidence plays at 30 FPS with real elapsed timing: gaps repeat the last captured frame, and captures above 30 FPS are dropped. JPEG pre-roll reduces memory use; clips contain raw camera images without detection overlays. JSON records the track ID, full-frame zone, entry and confirmation times, clip path, and completion status; completed incidents also include exit, removal, close, and duration fields. If recording stops early, JSON marks the clip incomplete.
+
+```text
+incidents/
+├── 1/
+│   ├── incident.mp4
+│   └── incident.json
+└── 2/
+    ├── incident.mp4
+    └── incident.json
+```
 
 See [MILESTONES.md](MILESTONES.md) for current order, pass conditions, and the next implementation slice.
 
