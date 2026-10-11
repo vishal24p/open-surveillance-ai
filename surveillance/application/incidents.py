@@ -4,14 +4,11 @@ from ..models import TrackedDetection
 
 
 DWELL_SECONDS = 2.0
-# Keep aligned with `track_buffer` in botsort_accuracy.yaml.
-TRACK_LOST_FRAMES = 30
 POST_ROLL_SECONDS = 10.0
 
 
 @dataclass(frozen=True, slots=True)
 class ConfirmedIncident:
-    track_id: int
     started_at: float
     confirmed_at: float
     started_epoch: float
@@ -23,35 +20,29 @@ class CompletedIncident:
     incident: ConfirmedIncident
     exit_at: float
     exit_epoch: float
-    removed_at: float
-    removed_epoch: float
     closed_at: float
     closed_epoch: float
     duration_seconds: float
 
 
 @dataclass(slots=True)
-class _Track:
+class _Scene:
     started_at: float
     started_epoch: float
-    last_seen_at: float
-    last_seen_epoch: float
-    missing_frames: int = 0
     incident: ConfirmedIncident | None = None
-    removed_at: float | None = None
-    removed_epoch: float | None = None
+    empty_at: float | None = None
+    empty_epoch: float | None = None
 
 
 class IncidentTracker:
     def __init__(self) -> None:
-        self._tracks: dict[int, _Track] = {}
+        self._scene: _Scene | None = None
 
     @property
     def pending_started_at(self) -> float | None:
-        return min(
-            (track.started_at for track in self._tracks.values() if track.incident is None),
-            default=None,
-        )
+        if self._scene is not None and self._scene.incident is None:
+            return self._scene.started_at
+        return None
 
     def update(
         self,
@@ -61,76 +52,47 @@ class IncidentTracker:
     ) -> tuple[list[ConfirmedIncident], list[CompletedIncident]]:
         confirmed = []
         completed = []
-        seen_ids = {
-            detection.track_id
-            for detection in detections
-            if detection.track_id is not None
-        }
+        scene = self._scene
+        if scene is not None and scene.empty_at is not None:
+            if now >= scene.empty_at + POST_ROLL_SECONDS:
+                completed.append(self._complete(scene))
+                self._scene = scene = None
 
-        for track_id in seen_ids:
-            track = self._tracks.get(track_id)
-            if track is None:
-                track = _Track(now, epoch, now, epoch)
-                self._tracks[track_id] = track
-            elif track.removed_at is not None:
-                if now > track.removed_at + POST_ROLL_SECONDS:
-                    completed.append(self._complete(track))
-                    track = _Track(now, epoch, now, epoch)
-                    self._tracks[track_id] = track
-                else:
-                    track.removed_at = None
-                    track.removed_epoch = None
-                    track.missing_frames = 0
+        if not detections:
+            if scene is not None:
+                if scene.incident is None:
+                    self._scene = None
+                elif scene.empty_at is None:
+                    scene.empty_at = now
+                    scene.empty_epoch = epoch
+            return confirmed, completed
 
-            track.last_seen_at = now
-            track.last_seen_epoch = epoch
-            track.missing_frames = 0
-            if (
-                track.incident is None
-                and now - track.started_at >= DWELL_SECONDS
-            ):
-                track.incident = ConfirmedIncident(
-                    track_id,
-                    track.started_at,
-                    now,
-                    track.started_epoch,
-                    epoch,
-                )
-                confirmed.append(track.incident)
-
-        for track_id, track in list(self._tracks.items()):
-            if track_id in seen_ids:
-                continue
-
-            track.missing_frames += 1
-            if track.missing_frames <= TRACK_LOST_FRAMES:
-                continue
-
-            if track.incident is None:
-                del self._tracks[track_id]
-                continue
-
-            if track.removed_at is None:
-                track.removed_at = now
-                track.removed_epoch = epoch
-            elif now >= track.removed_at + POST_ROLL_SECONDS:
-                completed.append(self._complete(track))
-                del self._tracks[track_id]
+        if scene is None:
+            scene = _Scene(now, epoch)
+            self._scene = scene
+        scene.empty_at = None
+        scene.empty_epoch = None
+        if scene.incident is None and now - scene.started_at >= DWELL_SECONDS:
+            scene.incident = ConfirmedIncident(
+                scene.started_at,
+                now,
+                scene.started_epoch,
+                epoch,
+            )
+            confirmed.append(scene.incident)
 
         return confirmed, completed
 
     @staticmethod
-    def _complete(track: _Track) -> CompletedIncident:
-        assert track.incident is not None
-        assert track.removed_at is not None
-        assert track.removed_epoch is not None
+    def _complete(scene: _Scene) -> CompletedIncident:
+        assert scene.incident is not None
+        assert scene.empty_at is not None
+        assert scene.empty_epoch is not None
         return CompletedIncident(
-            incident=track.incident,
-            exit_at=track.last_seen_at,
-            exit_epoch=track.last_seen_epoch,
-            removed_at=track.removed_at,
-            removed_epoch=track.removed_epoch,
-            closed_at=track.removed_at + POST_ROLL_SECONDS,
-            closed_epoch=track.removed_epoch + POST_ROLL_SECONDS,
-            duration_seconds=track.last_seen_at - track.incident.started_at,
+            incident=scene.incident,
+            exit_at=scene.empty_at,
+            exit_epoch=scene.empty_epoch,
+            closed_at=scene.empty_at + POST_ROLL_SECONDS,
+            closed_epoch=scene.empty_epoch + POST_ROLL_SECONDS,
+            duration_seconds=scene.empty_at - scene.incident.started_at,
         )

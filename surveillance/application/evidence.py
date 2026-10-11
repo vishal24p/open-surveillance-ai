@@ -23,7 +23,7 @@ class EvidenceRecorder:
         self._output_dir = output_dir
         self._writer_factory = writer_factory or cv2.VideoWriter
         self._history: deque[tuple[float, bytes]] = deque()
-        self._writers = {}
+        self._writer = None
 
     def buffer_frame(self, frame, now: float, pending_started_at: float | None = None) -> None:
         # shortcut: JPEG pre-roll trades fidelity for lower RAM use; use lossless segments for audit-grade evidence.
@@ -46,17 +46,18 @@ class EvidenceRecorder:
         now: float,
         completed: list[CompletedIncident],
     ) -> None:
-        closed_at = {
-            incident.incident.track_id: incident.closed_at
-            for incident in completed
-        }
-        for track_id, writer in self._writers.items():
-            deadline = closed_at.get(track_id, now)
-            self._write_frame(
-                writer, frame if now <= deadline else writer["last_frame"], min(now, deadline)
-            )
+        if self._writer is None:
+            return
+        deadline = completed[0].closed_at if completed else now
+        self._write_frame(
+            self._writer,
+            frame if now <= deadline else self._writer["last_frame"],
+            min(now, deadline),
+        )
 
     def start_incident(self, incident: ConfirmedIncident) -> Path:
+        if self._writer is not None:
+            raise RuntimeError("A frame incident is already recording.")
         self._output_dir.mkdir(parents=True, exist_ok=True)
         number = 1
         while True:
@@ -66,10 +67,11 @@ class EvidenceRecorder:
                 break
             except FileExistsError:
                 number += 1
-        stamp = datetime.fromtimestamp(
-            incident.started_epoch, timezone.utc
-        ).strftime("%Y%m%dT%H%M%S%fZ")
         video_path = incident_dir / "incident.mp4"
+        self._write_metadata(
+            video_path,
+            self._metadata({"incident": incident, "video_path": video_path}, None),
+        )
         buffered = [
             (timestamp, data)
             for timestamp, data in self._history
@@ -104,7 +106,7 @@ class EvidenceRecorder:
             writer.release()
             raise
 
-        self._writers[incident.track_id] = record
+        self._writer = record
         return video_path
 
     @staticmethod
@@ -118,7 +120,7 @@ class EvidenceRecorder:
         record["last_frame"] = frame
 
     def finish_incident(self, completed: CompletedIncident) -> None:
-        record = self._writers.pop(completed.incident.track_id, None)
+        record = self._writer
         if record is None:
             return
 
@@ -128,22 +130,23 @@ class EvidenceRecorder:
             record["handle"].release()
         metadata = self._metadata(record, completed)
         self._write_metadata(record["video_path"], metadata)
+        self._writer = None
 
     def close(self) -> None:
-        records = list(self._writers.values())
-        self._writers.clear()
+        record = self._writer
+        if record is None:
+            return
+        self._writer = None
         first_error = None
-        for record in records:
-            try:
-                record["handle"].release()
-            except Exception as error:
-                if first_error is None:
-                    first_error = error
-            try:
-                self._write_metadata(record["video_path"], self._metadata(record, None))
-            except Exception as error:
-                if first_error is None:
-                    first_error = error
+        try:
+            record["handle"].release()
+        except Exception as error:
+            first_error = error
+        try:
+            self._write_metadata(record["video_path"], self._metadata(record, None))
+        except Exception as error:
+            if first_error is None:
+                first_error = error
         if first_error is not None:
             raise first_error
 
@@ -159,7 +162,6 @@ class EvidenceRecorder:
         incident = record["incident"]
         metadata = {
             "zone": "full_frame",
-            "track_id": incident.track_id,
             "entry_time": _iso_time(incident.started_epoch),
             "confirmation_time": _iso_time(incident.confirmed_epoch),
             "evidence_clip_path": str(record["video_path"]),
@@ -169,7 +171,6 @@ class EvidenceRecorder:
             metadata.update(
                 {
                     "exit_time": _iso_time(completed.exit_epoch),
-                    "track_removed_at": _iso_time(completed.removed_epoch),
                     "closed_at": _iso_time(completed.closed_epoch),
                     "duration_seconds": completed.duration_seconds,
                 }
@@ -179,10 +180,12 @@ class EvidenceRecorder:
     @staticmethod
     def _write_metadata(video_path: Path, metadata: dict) -> None:
         metadata_path = video_path.with_suffix(".json")
-        metadata_path.write_text(
-            json.dumps(metadata, indent=2),
-            encoding="utf-8",
-        )
+        temporary_path = metadata_path.with_suffix(".json.tmp")
+        try:
+            temporary_path.write_text(json.dumps(metadata, indent=2), encoding="utf-8")
+            temporary_path.replace(metadata_path)
+        finally:
+            temporary_path.unlink(missing_ok=True)
 
 
 def _iso_time(epoch: float) -> str:

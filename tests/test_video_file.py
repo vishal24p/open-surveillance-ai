@@ -92,6 +92,47 @@ class VideoFileSourceTests(unittest.TestCase):
 
         self.capture.get.assert_not_called()
 
+    def test_invalid_final_timestamp_is_skipped_at_eof(self) -> None:
+        frame = np.zeros((4, 4, 3), dtype=np.uint8)
+        for timestamp in (0.0, 50.0, 100.0, -1.0, float("nan"), float("inf"), float("-inf")):
+            with self.subTest(timestamp=timestamp):
+                self.capture.read.side_effect = [(True, frame), (True, frame), (False, None)]
+                self.capture.get.side_effect = [100.0, timestamp]
+                source = VideoFileSource(self.path)
+                self.addCleanup(source.close)
+                source.read()
+
+                with patch("builtins.print") as message:
+                    self.assertEqual(source.read(), (False, None))
+
+                self.assertEqual(source.position_seconds, 0.1)
+                self.assertIn("invalid final timestamp", message.call_args.args[0])
+
+    def test_invalid_first_timestamp_followed_by_eof_is_rejected(self) -> None:
+        frame = np.zeros((4, 4, 3), dtype=np.uint8)
+        self.capture.read.side_effect = [(True, frame), (False, None)]
+        self.capture.get.return_value = -1.0
+        source = VideoFileSource(self.path)
+        self.addCleanup(source.close)
+
+        with self.assertRaisesRegex(RuntimeError, "timestamp"):
+            source.read()
+
+        self.assertIsNone(source.position_seconds)
+
+    def test_two_invalid_trailing_frames_are_rejected(self) -> None:
+        frame = np.zeros((4, 4, 3), dtype=np.uint8)
+        self.capture.read.side_effect = [(True, frame)] * 3 + [(False, None)]
+        self.capture.get.side_effect = [100.0, 0.0, 0.0]
+        source = VideoFileSource(self.path)
+        self.addCleanup(source.close)
+        source.read()
+
+        with self.assertRaisesRegex(RuntimeError, "timestamp"):
+            source.read()
+
+        self.assertEqual(source.position_seconds, 0.1)
+
     def test_close_releases_capture(self) -> None:
         source = VideoFileSource(self.path)
 

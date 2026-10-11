@@ -30,6 +30,11 @@ class VideoFileSource:
             or position < 0
             or (self.position_seconds is not None and position <= self.position_seconds)
         ):
+            if self.position_seconds is not None:
+                next_ok, _ = self._capture.read()
+                if not next_ok:
+                    print(f"Skipped frame with invalid final timestamp: {self._path}")
+                    return False, None
             raise RuntimeError(
                 f"Video timestamps must be finite, non-negative, and strictly increasing: {self._path}"
             )

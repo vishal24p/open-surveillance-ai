@@ -41,14 +41,11 @@ class LivePipeline:
                 self._evidence.write_active_frame(raw_frame, now, completed)
                 for incident in completed:
                     self._evidence.finish_incident(incident)
-                    print(
-                        "Incident clip saved: "
-                        f"track #{incident.incident.track_id}"
-                    )
+                    print("Full-frame incident clip saved.")
                 for incident in confirmed:
                     path = self._evidence.start_incident(incident)
                     print(
-                        f"Incident confirmed for track #{incident.track_id}; "
+                        "Full-frame incident confirmed; "
                         f"saving {path}"
                     )
 
